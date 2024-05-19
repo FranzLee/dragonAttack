@@ -1,0 +1,441 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="zh-Hant-TW" lang="zh-Hant-TW">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<style>
+canvas {
+    border: 1px solid #d3d3d3;
+    background-color: #000000;
+} 
+.styleTopic {
+    color: rgba(153,153,255,1);
+    font-size: xx-large;
+    font-weight: bold;
+}
+
+ .styleText {
+    color: rgba(153, 153, 255, 1);
+    font-size: medium;
+}
+</style>
+</head>
+<body onload="startGame()">
+<script>
+var myGameArea = {
+    canvas : document.createElement("canvas"),
+    start : function() {
+        this.canvas.width = 960;
+        this.canvas.height = 540;
+        this.context = this.canvas.getContext("2d");
+        document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+        this.frame = 0
+        this.interval = setInterval(updateGameArea, 20);
+    }, 
+    clear : function() {
+        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    },
+    stop : function() {
+        clearInterval(this.interval)
+    }
+}
+
+function updateGameArea() {
+    myGameArea.clear();
+    player.update();
+    if(myGameArea.frame % 10 == 0) {
+        bullet.push(new bullets());
+    }
+    for(var k = bullet.length - 1; k >= 0; k--) {
+        if(bullet[k].y + bullet[k].height < 0) {
+            bullet.splice(k, 1);
+        }
+        else if(bullet[k].y > myGameArea.canvas.height) {
+            bullet.splice(k, 1);
+        }
+        else if(bullet[k].x + bullet[k].width < 0) {
+            bullet.splice(k, 1);
+        }
+        else if(bullet[k].x > myGameArea.canvas.width) {
+            bullet.splice(k, 1);
+        }
+    }
+    for(var i = 0; i < bullet.length; i++) {
+        bullet[i].update();
+    }
+    if(player.challengeLevel >= 1) {
+        dragon[player.challengeLevel - 1].update();
+    }
+    for(var i = 0; i < HPBars.length; i++) {
+        HPBars[i].update();
+    }
+    
+    myGameArea.frame += 1;
+}
+
+class players {
+    constructor() {
+        this.x = myGameArea.canvas.width / 2;
+        this.y = myGameArea.canvas.height / 4 * 3;
+        this.acclerateX = 0;
+        this.acclerateY = 0;
+        this.width = 40;
+        this.height = 40;
+        this.HP = 3;
+        this.attackPower = 1;
+        this.defensePower = 0;
+        this.magic = {
+            type : "",
+            waitFrames : 0
+        };
+        this.challengeLevel = 0;
+        var self = this;
+        this.speedControler = 3;
+        window.addEventListener("keydown", function(e) {
+            if(e.code == "ArrowUp") {
+                self.acclerateY = -self.speedControler;
+            }
+            else if(e.code == "ArrowDown") {
+                self.acclerateY = self.speedControler;
+            }
+            else if(e.code == "ArrowRight") {
+                self.acclerateX = self.speedControler;
+            }
+            else if(e.code == "ArrowLeft") {
+                self.acclerateX = -self.speedControler;
+            }
+        });
+        window.addEventListener("keyup", function(e) {
+            if((e.code == "ArrowUp") || (e.code == "ArrowDown")) {
+                self.acclerateY = 0;
+            }
+            else if((e.code == "ArrowRight") || (e.code == "ArrowLeft")) {
+                self.acclerateX = 0;
+            }
+        });
+    }
+    detectObjectCollision(object) {
+        var result = true;
+        if((this.x + this.width < object.x) || (object.x + object.width < this.x) || (this.y + this.height < object.y) || (object.y + object.height < this.y)) {
+            result = false;
+        }
+        return result;
+    }
+    update() {
+        this.x += this.acclerateX;
+        this.y += this.acclerateY;
+        if(this.x + this.width > myGameArea.canvas.width) {
+            this.x = myGameArea.canvas.width - this.width;
+        }
+        if(this.y + this.height > myGameArea.canvas.height) {
+            this.y = myGameArea.canvas.height - this.height;
+        }
+        if(this.x < 0) {
+            this.x = 0;
+        }
+        if(this.y < 0) {
+            this.y = 0;
+        }
+        myGameArea.context.fillStyle = "white";
+        myGameArea.context.fillRect(this.x, this.y, this.width, this.height);
+        if(this.HP <= 0) {
+            myGameArea.stop();
+        }
+    }
+    beAttacked(damage) {
+        if((damage - this.defensePower) > 0) {
+            this.HP -= (damage - this.defensePower);
+            var self = this;
+            var originalDefensePower = this.defensePower;
+            this.defensePower = 10000;
+            var damageInterval = setInterval(function() {
+                self.defensePower = originalDefensePower;
+            },1000);
+        }
+    }
+    nextLevel() {
+        if(this.challengeLevel >= 0) {
+            this.challengeLevel += 1;
+            dragon[this.challengeLevel - 1].attack();
+        }
+    }
+}
+class bullets {
+    constructor() {
+        this.width = 4;
+        this.height = 2;
+        this.x = player.x + (player.width - this.width) / 2;
+        this.y = (player.y - this.height);
+    }
+    update() {
+        this.y -= 5;
+        if(player.challengeLevel) {
+            if(this.detectObjectCollision(dragon[player.challengeLevel - 1])) {
+                dragon[player.challengeLevel - 1].beAttacked(player.attackPower);
+                this.y = -5;
+            }
+        }
+        myGameArea.context.fillStyle = "white";
+        myGameArea.context.fillRect(this.x, this.y, this.width, this.height);
+    }
+    detectObjectCollision(object) {
+        var result = true;
+        if((this.x + this.width < object.x) || (object.x + object.width < this.x) || (this.y + this.height < object.y) || (object.y + object.height < this.y)) {
+            result = false;
+        }
+        return result;
+    }
+}
+class bossBullets {
+    constructor(x, y, v, type, vX, vY, r) {
+        this.x = x;
+        this.y = y;
+        this.v = {
+            all : v,
+            x : vX,
+            y : vY,
+            zita : 0
+        }
+        this.r = r;
+        this.type = type;
+    }
+    detectObjectCollision(object) {
+        var result = false;
+        var deltaX = Math.abs(this.x - (object.x + object.width / 2));
+        var deltaY = Math.abs(this.y - (object.y + object.height / 2));
+        var objectR = Math.sqrt(Math.pow(object.width / 2, 2) + Math.pow(object.height / 2, 2));
+        if(Math.sqrt(Math.pow(deltaX, 2) + Math.pow(deltaY, 2)) < (this.r + objectR)) {
+            result = true;
+        }
+        return result;
+    }
+    update() {
+        if(this.type == "follow") {
+            if(this.v.zita < 0) {
+                this.v.zita += 360
+            }
+            if(myGameArea.frame % 5 == 0) {
+                var turnDegree = this.getDegree(this.x, this.y, player.x + (player.width / 2), player.y + (player.height / 2)) - this.v.zita;
+                if(turnDegree > 180) {
+                    turnDegree = turnDegree - 360;
+                }
+                if(turnDegree > 5) {
+                    turnDegree = 5;
+                }
+                else if(turnDegree < -5) {
+                    turnDegree = -5;
+                }
+                this.v.zita += turnDegree;
+                this.v.y = -this.v.all * Math.sin(this.v.zita / 180 * Math.PI);
+                this.v.x = this.v.all * Math.cos(this.v.zita / 180 * Math.PI); 
+            }
+            this.x += this.v.x;
+            this.y += this.v.y;
+            if(this.detectObjectCollision(player)) {
+                player.beAttacked(dragon[player.challengeLevel - 1].attackPower);
+            }
+            myGameArea.context.fillStyle = "red";
+            myGameArea.context.beginPath();
+            myGameArea.context.arc(this.x, this.y, this.r, 0, 2 * Math.PI);
+            myGameArea.context.closePath();
+            myGameArea.context.fill();
+            myGameArea.context.stroke();
+        }
+        else if(this.type == "normal") {
+            this.x += this.v.x;
+            this.y += this.v.y;
+            if(this.detectObjectCollision(player)) {
+                player.beAttacked(dragon[player.challengeLevel - 1].attackPower);
+            }
+            myGameArea.context.fillStyle = "red";
+            myGameArea.context.beginPath();
+            myGameArea.context.arc(this.x, this.y, this.r, 0, 2 * Math.PI);
+            myGameArea.context.closePath();
+            myGameArea.context.fill();
+            myGameArea.context.stroke();
+        }
+    }
+    getDegree(x1, y1, x2, y2) {
+        var bestDegree = 0;
+        var bestDeviation = 100000000;
+        var target = Math.abs((y2 - y1) / (x2 - x1));
+        for(var i = 0; i <= 90; i++) {
+            if(Math.abs(Math.tan(i / 180 * Math.PI) - target) < bestDeviation) {
+                bestDegree = i;
+                bestDeviation = Math.abs(Math.tan(i / 180 * Math.PI) - target);
+            }
+        }
+        if((x1 > x2) && (y1 > y2)) {
+            bestDegree = 180 - bestDegree;
+        }
+        else if((x1 > x2) && (y1 < y2)) {
+            bestDegree += 180;
+        }
+        else if((x1 < x2) && (y1 < y2)) {
+            bestDegree = 360 - bestDegree;
+        }
+        return bestDegree;
+    }
+}
+class HPBar {
+    constructor(maxHP, object) {
+        this.x = object.x + object.width / 2 - 10;
+        this.y = object.y - 10;
+        this.width = 20;
+        this.height = 5;
+        this.color = "green";
+        this.maxHP = maxHP;
+        this.HP = maxHP;
+        this.targetObject = object;
+        this.innerWidth = 20;
+    }
+    update() {
+        this.HP = this.targetObject.HP;
+        this.x = this.targetObject.x + this.targetObject.width / 2 - 10;
+        this.y = this.targetObject.y - 10;
+        if(this.maxHP < this.HP) {
+            this.maxHP = this.HP;
+        }
+        this.innerWidth = this.HP / this.maxHP * this.width;
+        if(this.HP / this.maxHP < 0.25) {
+            this.color = "red";
+        }
+        else if(this.HP / this.maxHP < 0.5) {
+            this.color = "orange";
+        }
+        else if( this.HP / this.maxHP < 0.75) {
+            this.color = "yellow";
+        }
+        else {
+            this.color = "green";
+        }
+        myGameArea.context.fillStyle = "white";
+        myGameArea.context.fillRect(this.x, this.y, this.width, this.height);
+        myGameArea.context.fillStyle = this.color;
+        myGameArea.context.fillRect(this.x, this.y, this.innerWidth, this.height);
+    }
+}
+class dragons {
+    constructor(HP, attackPower, defensePower, x, y, width, height) {
+        this.HP = HP;
+        this.attackPower = attackPower;
+        this.defensePower = defensePower;
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.acclerateX = 0;
+        this.acclerateY = 0;
+    }
+    detectObjectCollision(object) {
+        var result = true;
+        if((this.x + this.width < object.x) || (object.x + object.width < this.x) || (this.y + this.height < object.y) || (object.y + object.height < this.y)) {
+            result = false;
+        }
+        return result;
+    }
+    beAttacked(damage) {
+        if(damage - this.defensePower > 0) {
+            this.HP -= (damage - this.defensePower);
+        }
+    }
+    update() {
+        this.x += this.acclerateX;
+        this.y += this.acclerateY;
+        myGameArea.context.fillStyle = "skyBlue";
+        myGameArea.context.fillRect(this.x, this.y, this.width, this.height);
+        if(this.HP <= 0) {
+            player.nextLevel();
+            HPBars[1] = new HPBar(500, dragon[player.challengeLevel - 1]);
+        }
+        if(this.detectObjectCollision(player)) {
+            player.beAttacked(this.attackPower);
+        }
+    }
+}
+class firstDragon extends dragons {
+    waitingOrnot = false;
+    attack() {
+        var attackMode = getRandom(4);
+        // var attackMode = 3;
+        if(attackMode == 0) {
+            var runTimes = 10;
+            var self = this;
+            var myInterval = setInterval(function() {
+                self.moveToRandomPlace();
+                runTimes--;
+                if(runTimes == 0) {
+                    clearInterval(myInterval);
+                    if(self.HP > 0) {
+                        self.attack();
+                    }
+                }
+            }, 1000)
+        }
+        else if(attackMode == 1) {
+            var self = this;
+            this.x = player.x;
+            this.y = 100;
+            var myInterval = setInterval(function() {
+                clearInterval(myInterval);
+                if(self.HP > 0) {
+                    self.attack();
+                }
+            }, 1000)
+            bullet.push(new bossBullets(this.x + (this.width / 2),this.y + (this.height / 2), 3, "normal", 0, 3, 30));
+        }
+        else if(attackMode == 2) {
+            var self = this;
+            var bulletX = getRandom(100);
+            var myInterval = setInterval(function() {
+                if(bulletX > myGameArea.canvas.width) {
+                    clearInterval(myInterval);
+                    if(self.HP > 0) {
+                        self.attack();
+                    }
+                }
+                bullet.push(new bossBullets(bulletX, 0, 3, "normal", 0, 3, 10));
+                bulletX += 100;
+            }, 1000)
+        }
+        else if(attackMode == 3) {
+            var self = this;
+            var runTimes = 10;
+            var myInterval = setInterval(function() {
+                if(runTimes <= 0) {
+                    clearInterval(myInterval);
+                    if(self.HP > 0) {
+                        self.attack();
+                    }
+                }
+                bullet.push(new bossBullets(self.x + (self.width / 2), self.y + self.height, 3, "follow", 3, 0, 10));
+                runTimes --;
+            }, 500)
+        }
+    }
+    moveToRandomPlace() {
+        this.x = getRandom(myGameArea.canvas.width - this.width);
+        this.y = getRandom(myGameArea.canvas.height - 100 - this.height);
+    }
+}
+
+var player = new players();
+var bullet = [];
+var dragon = [];
+var HPBars = [];
+function startGame() {
+    myGameArea.start();
+    player = new players();
+    bullet = [];
+    dragon = [];
+    HPBars = [];
+    dragon.push(new firstDragon(300, 1, 0, 480, 100, 70, 90));
+    HPBars.push(new HPBar(3, player));
+    HPBars.push(new HPBar(300, dragon[0])); // 之後要新增新的血條，請替換HPbars[1]
+    player.nextLevel(); // 做完開頭後請移除
+}
+
+function getRandom(x) {
+    return Math.floor(Math.random() * Number(x));
+}
+</script>
+</body>
